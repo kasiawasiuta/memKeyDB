@@ -94,6 +94,10 @@ start_server {tags {"introspection"}} {
             slaveof
             bind
             requirepass
+            dram-pmem-ratio
+            memory-alloc-policy
+            initial-dynamic-threshold
+            dynamic-threshold-min
         }
 
         set configs {}
