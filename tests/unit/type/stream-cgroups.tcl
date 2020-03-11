@@ -147,6 +147,29 @@ start_server {
         assert {[lindex $res 0 1 1] == {2-0 {field1 B}}}
     }
 
+    test {Blocking XREADGROUP will not reply with an empty array} {
+        r del mystream
+        r XGROUP CREATE mystream mygroup $ MKSTREAM
+        r XADD mystream 666 f v
+        set res [r XREADGROUP GROUP mygroup Alice BLOCK 10 STREAMS mystream ">"]
+        assert {[lindex $res 0 1 0] == {666-0 {f v}}}
+        r XADD mystream 667 f2 v2
+        r XDEL mystream 667
+        set rd [redis_deferring_client]
+        $rd XREADGROUP GROUP mygroup Alice BLOCK 10 STREAMS mystream ">"
+        after 20
+        assert {[$rd read] == {}} ;# before the fix, client didn't even block, but was served synchronously with {mystream {}}
+    }
+
+    test {XGROUP DESTROY should unblock XREADGROUP with -NOGROUP} {
+        r del mystream
+        r XGROUP CREATE mystream mygroup $ MKSTREAM
+        set rd [redis_deferring_client]
+        $rd XREADGROUP GROUP mygroup Alice BLOCK 100 STREAMS mystream ">"
+        r XGROUP DESTROY mystream mygroup
+        assert_error "*NOGROUP*" {$rd read}
+    }
+
     test {XCLAIM can claim PEL items from another consumer} {
         # Add 3 items into the stream, and create a consumer group
         r del mystream
