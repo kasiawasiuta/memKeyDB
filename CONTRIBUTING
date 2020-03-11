@@ -25,4 +25,6 @@ Here you'll see if there is consensus about your idea.
 
 3. For minor fixes just open a pull request on Github.
 
+4. MemKeyDB has 4 core maintainers. Each patch must receive an approval from at least two core maintainers and pass all CI checks before it can be merged.
+
 Thanks!
