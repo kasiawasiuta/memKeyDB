@@ -91,6 +91,14 @@ configEnum aof_fsync_enum[] = {
     {NULL, 0}
 };
 
+configEnum memory_alloc_policy_enum[] = {
+    {"only-dram", MEM_POLICY_ONLY_DRAM},
+    {"only-pmem", MEM_POLICY_ONLY_PMEM},
+    {"threshold", MEM_POLICY_THRESHOLD},
+    {"ratio", MEM_POLICY_RATIO},
+    {NULL, 0}
+};
+
 configEnum repl_diskless_load_enum[] = {
     {"disabled", REPL_DISKLESS_LOAD_DISABLED},
     {"on-empty-db", REPL_DISKLESS_LOAD_WHEN_DB_EMPTY},
@@ -373,6 +381,14 @@ void loadServerConfigFromString(char *config) {
             } else if (argc == 2 && !strcasecmp(argv[1],"")) {
                 resetServerSaveParams();
             }
+        } else if (!strcasecmp(argv[0],"dram-pmem-ratio") && argc == 3) {
+                int dram = atoi(argv[1]);
+                int pmem = atoi(argv[2]);
+                if (dram == 0 || pmem == 0) {
+                  err = "Invalid dram-pmem-ratio parameters"; goto loaderr;
+                }
+                server.dram_pmem_ratio.dram_val = dram;
+                server.dram_pmem_ratio.pmem_val = pmem;
         } else if (!strcasecmp(argv[0],"dir") && argc == 2) {
             if (chdir(argv[1]) == -1) {
                 serverLog(LL_WARNING,"Can't chdir to '%s': %s",
@@ -511,6 +527,12 @@ void loadServerConfigFromString(char *config) {
         linenum = slaveof_linenum;
         i = linenum-1;
         err = "replicaof directive not allowed in cluster mode";
+        goto loaderr;
+    }
+
+    if (server.dram_pmem_ratio.pmem_val == 0 && server.dram_pmem_ratio.dram_val == 0 &&
+        server.memory_alloc_policy == MEM_POLICY_RATIO) {
+        err = "dram-pmem-ratio must be defined for ratio memory allocation policy";
         goto loaderr;
     }
 
@@ -857,6 +879,13 @@ void configGetCommand(client *c) {
         addReplyBulkCString(c,"client-output-buffer-limit");
         addReplyBulkCString(c,buf);
         sdsfree(buf);
+        matches++;
+    }
+    if  (stringmatch(pattern,"dram-pmem-ratio",1)) {
+        char buf[32];
+        snprintf(buf,sizeof(buf),"%d %d", server.dram_pmem_ratio.dram_val, server.dram_pmem_ratio.pmem_val);
+        addReplyBulkCString(c,"dram-pmem-ratio");
+        addReplyBulkCString(c,buf);
         matches++;
     }
     if (stringmatch(pattern,"unixsocketperm",1)) {
@@ -2029,6 +2058,16 @@ static int updateAppendonly(int val, int prev, char **err) {
     return 1;
 }
 
+static int updateStaticthreshold(long long val, long long prev, char **err) {
+    UNUSED(prev);
+    UNUSED(err);
+    if (server.memory_alloc_policy == MEM_POLICY_THRESHOLD) {
+        zmalloc_set_threshold((size_t)val);
+    }
+
+    return 1;
+}
+
 static int updateMaxclients(long long val, long long prev, char **err) {
     /* Try to check if the OS is capable of supporting so many FDs. */
     if (val > prev) {
@@ -2132,6 +2171,7 @@ standardConfig configs[] = {
     createEnumConfig("loglevel", NULL, MODIFIABLE_CONFIG, loglevel_enum, server.verbosity, LL_NOTICE, NULL, NULL),
     createEnumConfig("maxmemory-policy", NULL, MODIFIABLE_CONFIG, maxmemory_policy_enum, server.maxmemory_policy, MAXMEMORY_NO_EVICTION, NULL, NULL),
     createEnumConfig("appendfsync", NULL, MODIFIABLE_CONFIG, aof_fsync_enum, server.aof_fsync, AOF_FSYNC_EVERYSEC, NULL, NULL),
+    createEnumConfig("memory-alloc-policy", NULL, IMMUTABLE_CONFIG, memory_alloc_policy_enum, server.memory_alloc_policy, MEM_POLICY_ONLY_DRAM, NULL, NULL),
 
     /* Integer configs */
     createIntConfig("databases", NULL, IMMUTABLE_CONFIG, 1, INT_MAX, server.dbnum, 16, INTEGER_CONFIG, NULL, NULL),
@@ -2168,6 +2208,9 @@ standardConfig configs[] = {
 
     /* Unsigned int configs */
     createUIntConfig("maxclients", NULL, MODIFIABLE_CONFIG, 1, UINT_MAX, server.maxclients, 10000, INTEGER_CONFIG, NULL, updateMaxclients),
+    createUIntConfig("initial-dynamic-threshold", NULL, IMMUTABLE_CONFIG, 0, UINT_MAX, server.initial_dynamic_threshold, 64, INTEGER_CONFIG, NULL, NULL),
+    createUIntConfig("dynamic-threshold-min", NULL, IMMUTABLE_CONFIG, 0, UINT_MAX, server.dynamic_threshold_min, 24, INTEGER_CONFIG, NULL, NULL),
+    createUIntConfig("static-threshold", NULL, MODIFIABLE_CONFIG, 0, UINT_MAX, server.static_threshold, 64, INTEGER_CONFIG, NULL, updateStaticthreshold),
 
     /* Unsigned Long configs */
     createULongConfig("active-defrag-max-scan-fields", NULL, MODIFIABLE_CONFIG, 1, LONG_MAX, server.active_defrag_max_scan_fields, 1000, INTEGER_CONFIG, NULL, NULL), /* Default: keys with more than 1000 fields will be processed separately */
