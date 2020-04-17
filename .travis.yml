@@ -1,0 +1,17 @@
+language: c
+dist: bionic
+compiler:
+  - gcc
+  - clang
+
+addons:
+  apt:
+    packages:
+        - tcl8.5
+
+script:
+  - make gcov
+  - ./runtest --clients 2
+
+after_success:
+  - bash <(curl -s https://codecov.io/bash) -p src
