@@ -42,10 +42,8 @@ Allocator
 ---------
 
 Selecting a non-default memory allocator when building MemKeyDB is done by setting
-the `MALLOC` environment variable. MemKeyDB is compiled and linked against libc
-malloc by default, with the exception of jemalloc being the default on Linux
-systems. This default was picked because jemalloc has proven to have fewer
-fragmentation problems than libc malloc.
+the `MALLOC` environment variable. MemKeyDB is compiled and linked against
+memkind malloc by default.
 
 To force compiling against libc malloc, use:
 
@@ -54,6 +52,10 @@ To force compiling against libc malloc, use:
 To compile against jemalloc on Mac OS X systems, use:
 
     % make MALLOC=jemalloc
+
+To compile against memkind, use:
+
+    % make MALLOC=memkind
 
 Verbose build
 -------------
