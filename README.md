@@ -9,6 +9,16 @@ The data stored on the medium is volatile and the persistency is preserved with 
 
 Building MemKeyDB
 --------------
+You will need to install the following required packages on the build system:
+* libdaxctl-devel (v66 or later) -- required by memkind
+* memkind ([v1.10.1-rc2](https://github.com/memkind/memkind/releases/tag/v1.10.1-rc2) or later) - with custom build options described below
+
+To install memkind please call:
+
+    % ./autogen.sh
+    % ARENA_LIMIT=1 MIN_LG_ALIGN=3 ./configure --disable-heap-manager
+    % make
+    % make install
 
 It is as simple as:
 
